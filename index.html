@@ -567,11 +567,11 @@
                             </div>
                             <div class="d-flex gap-2 align-items-center">
                                 <select id="filterStokMenipis" class="form-select form-select-sm shadow-sm text-danger fw-bold border-danger" onchange="renderStokMenipis()" style="width: auto;">
-                                    <option value="5">≤ 5 (Default)</option>
-                                    <option value="4">≤ 4 Pcs</option>
-                                    <option value="3">≤ 3 Pcs</option>
-                                    <option value="2">≤ 2 Pcs</option>
                                     <option value="1">≤ 1 Pcs</option>
+                                    <option value="2">≤ 2 Pcs</option>
+                                    <option value="3">≤ 3 Pcs</option>
+                                    <option value="4">≤ 4 Pcs</option>
+                                    <option value="5">≤ 5 Pcs</option>
                                  </select>
                                 <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="downloadTxtStokMenipis()">📥 TXT</button>
                             </div>
@@ -742,7 +742,7 @@
         <div class="d-flex flex-column gap-2 w-100">
     <!-- Baris Tombol Bluetooth -->
     <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-primary btn-sm flex-fill rounded-pill fw-medium py-1" id="btnStatusBluetooth" onclick="hubungkanPrinterBluetooth()">🔵Konek BT</button>
+        <button type="button" class="btn btn-outline-primary btn-sm flex-fill rounded-pill fw-medium py-1" id="btnStatusBluetooth" onclick="hubungkanPrinterBluetooth()">🔵Cari BT</button>
         <button type="button" class="btn btn-primary btn-sm flex-fill rounded-pill fw-medium py-1" onclick="cetakStrukBluetooth()">🖨️ Cetak Struk</button>
     </div>
     
@@ -1312,10 +1312,18 @@ async function prosesPembayaran() {
 
     let namaPembeli = document.getElementById('pembeliKasir').value.trim() || 'Umum';
     let nominalDiskon = parseInt(document.getElementById('inputDiskon').value) || 0;
+    
+    // GUNAKAN SATU WAKTU ID TRANSAKSI UNTUK SELURUH KERANJANG
+    const waktuTransaksi = new Date().toISOString(); 
 
     bunyiBeepLoud('success');
     if (!navigator.onLine) {
-        simpanTransaksiOffline(namaPembeli, keranjang, nominalDiskon);
+        // Simpan offline dengan waktu yang sama
+        let pend = JSON.parse(localStorage.getItem('pos_pending_transactions') || '[]');
+        pend.push({ id_lokal: Date.now(), pembeli: namaPembeli, items: keranjang, diskon: nominalDiskon, waktu: waktuTransaksi, kasir: currentUser.nama_lengkap });
+        localStorage.setItem('pos_pending_transactions', JSON.stringify(pend));
+        keranjang.forEach(i => { let p = dbStok.find(s => s.sku === i.sku); if (p) p.stok -= i.qty; });
+        localStorage.setItem('pos_stok_cache_mobile', JSON.stringify(dbStok)); renderStok(dbStok); updateOnlineStatus();
         alert("⚠️ Transaksi Berhasil Disimpan (Offline)!");
     } else {
         if(!supabase) return;
@@ -1331,7 +1339,8 @@ async function prosesPembayaran() {
             await supabase.from('transaksi').insert([{
                 pembeli: namaPembeli, sku: item.sku, nama_barang: item.nama,
                 harga_beli: item.hargaBeli, harga_jual: item.hargaJual, qty: item.qty,
-                total_harga: subtotalItem, laba: labaItem, waktu: new Date().toISOString()
+                total_harga: subtotalItem, laba: labaItem, 
+                waktu: waktuTransaksi // <-- Gunakan waktuTransaksi yang sama
             }]);
         }
         hideLoading();
@@ -1628,21 +1637,47 @@ function renderKadaluarsa() {
     let el = document.getElementById('listDekatKadaluarsa');
     if (!el) return;
     let now = new Date();
-    let filtered = dbStok.filter(s => {
-        if (!s.kadaluarsa) return false;
+    
+    // Filter dan Hitung Selisih Hari
+    let listExp = [];
+    dbStok.forEach(s => {
+        if (!s.kadaluarsa) return;
+        
+        let expDate;
         let parts = s.kadaluarsa.split('-');
-        if (parts.length === 3) {
-            let expDate = new Date(parts[2], parts[1] - 1, parts[0]);
-            let diffDays = (expDate - now) / (1000 * 3600 * 24);
-            return diffDays <= 30;
+        
+        // Cek secara pintar: apakah format DD-MM-YYYY atau YYYY-MM-DD
+        if(parts.length === 3) {
+            if (parts[0].length === 2 && parts[2].length === 4) {
+                // DD-MM-YYYY
+                expDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            } else if (parts[0].length === 4) {
+                // YYYY-MM-DD
+                expDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            }
         }
-        return false;
+        
+        if(expDate) {
+            let diffDays = Math.ceil((expDate - now) / (1000 * 3600 * 24));
+            if (diffDays <= 30 && diffDays >= -99) {
+                listExp.push({ nama: s.nama, stok: s.stok, sisaHari: diffDays, rawDate: s.kadaluarsa });
+            }
+        }
     });
+
+    listExp.sort((a, b) => a.sisaHari - b.sisaHari);
+
     let html = '';
-    filtered.forEach(s => {
-        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom"><span class="fw-bold text-dark">${s.nama}</span><span class="badge bg-warning text-dark">Exp: ${s.kadaluarsa}</span></div>`;
+    listExp.forEach(s => {
+        let badgeColor = s.sisaHari <= 7 ? 'bg-danger' : 'bg-warning text-dark';
+        let txtHari = s.sisaHari < 0 ? 'Telah Expired' : `H-${s.sisaHari}`;
+        html += `<div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+            <div><span class="fw-bold text-dark">${s.nama}</span> <br><small class="text-muted">Exp: ${s.rawDate}</small></div>
+            <span class="badge ${badgeColor}">${txtHari}</span>
+        </div>`;
     });
-    if (filtered.length === 0) html = '<div class="text-center py-3 text-muted small">Tidak ada barang dekat kadaluarsa</div>';
+
+    if (listExp.length === 0) html = '<div class="text-muted small text-center py-3">Tidak ada barang kadaluarsa dalam waktu dekat</div>';
     el.innerHTML = html;
 }
 
@@ -1652,31 +1687,90 @@ function renderKadaluarsa() {
 
 // --- 2. FUNGSI UNTUK MERENDER TABEL RIWAYAT TRANSAKSI TERAKHIR ---
 function renderRiwayatTransaksi() {
+    let el = document.getElementById('tabelRiwayatTransaksi');
+    if (!el) return;
     let html = '';
-    // Ambil 10 transaksi terakhir dari cache
-    let trxTerakhir = cacheTrxData.slice(0, 10);
     
-    trxTerakhir.forEach((t, index) => {
-        let waktu = new Date(t.waktu).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-        
-        // Pengecekan Nama Barang: Jika tidak ada, tampilkan SKU. Jika SKU juga tidak ada, beri label khusus.
-        let namaBarang = t.nama_barang ? t.nama_barang : (t.sku ? `SKU: ${t.sku} (Dihapus)` : "(Barang Tidak Ditemukan/Dihapus)");
+    // Kelompokkan barang berdasarkan waktu transaksi (ID Struk)
+    let groupedTrx = {};
+    cacheTrxData.forEach(t => {
+        if (!groupedTrx[t.waktu]) groupedTrx[t.waktu] = { waktu: t.waktu, pembeli: t.pembeli, total_harga: 0, items: [] };
+        groupedTrx[t.waktu].items.push(t);
+        groupedTrx[t.waktu].total_harga += (t.total_harga || 0);
+    });
+
+    let trxTerbaru = Object.values(groupedTrx).sort((a, b) => new Date(b.waktu) - new Date(a.waktu)).slice(0, 10);
+
+    trxTerbaru.forEach(trx => {
+        let jam = new Date(trx.waktu).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        let summaryBarang = trx.items.length === 1 ? trx.items[0].nama_barang : `${trx.items[0].nama_barang} +${trx.items.length - 1} item lainnya`;
+        let totalQty = trx.items.reduce((sum, item) => sum + (item.qty || 0), 0);
         
         html += `<tr>
-            <td class="small text-muted align-middle">${waktu}</td>
-            <td class="fw-bold text-dark align-middle">${namaBarang}</td>
-            <td class="text-center align-middle">${t.qty || 0}</td>
-            <td class="text-end align-middle">
-                <span class="text-success fw-bold me-2">Rp ${(t.total_harga || 0).toLocaleString('id-ID')}</span>
-                <button class="btn btn-sm btn-outline-primary py-1 px-2 rounded-3 shadow-sm" onclick="cetakStrukUlang(${index})" title="Cetak Ulang Struk">
-                    🖨️ Cetak
-                </button>
+            <td class="text-muted small">${jam}</td>
+            <td class="fw-bold text-dark">${summaryBarang} <br><small class="text-primary">${trx.pembeli || 'Umum'}</small></td>
+            <td class="text-center">${totalQty}</td>
+            <td class="text-end fw-bold">Rp${trx.total_harga.toLocaleString('id-ID')}
+                <br><button class="btn btn-sm btn-outline-primary mt-1 py-0 px-2 rounded-pill" style="font-size: 10px;" onclick="cetakStrukUlang('${trx.waktu}')">🖨️ Cetak</button>
             </td>
         </tr>`;
     });
+    
+    if (trxTerbaru.length === 0) html = '<tr><td colspan="4" class="text-center py-5 text-muted">Belum ada transaksi</td></tr>';
+    el.innerHTML = html;
+}
 
-    if (trxTerakhir.length === 0) html = '<tr><td colspan="4" class="text-center py-5 text-muted">Belum ada transaksi</td></tr>';
-    document.getElementById('tabelRiwayatTransaksi').innerHTML = html;
+// FUNGSI BARU UNTUK CETAK ULANG TRANSAKSI
+function cetakStrukUlang(waktuKey) {
+    let items = cacheTrxData.filter(t => t.waktu === waktuKey);
+    if(items.length === 0) return alert("Data struk tidak ditemukan!");
+
+    let totalStruk = items.reduce((sum, i) => sum + i.total_harga, 0);
+    let html = `
+        <style>
+            @media print {
+                @page { margin: 0; } body { margin: 0.5cm; }
+                body * { visibility: hidden; }
+                #printAreaStruk, #printAreaStruk * { visibility: visible; }
+                #printAreaStruk { position: absolute; left: 0; top: 0; width: 100%; }
+            }
+            .struk-container { font-family: monospace; font-size: 13px; color: #000; width: 100%; max-width: 320px; margin: 0 auto; background: #fff; padding: 10px; }
+            .text-center { text-align: center; } .text-right { text-align: right; } .fw-bold { font-weight: bold; }
+        </style>
+        <div class="struk-container">
+            <div class="text-center">
+                <h3 style="margin:0;">🏪 TOKO ZIYAD</h3>
+                <p style="margin:2px 0;">Struk Cetak Ulang (Copy)</p>
+            </div>
+            <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr><td width="35%">Tanggal</td><td>: ${new Date(waktuKey).toLocaleString('id-ID')}</td></tr>
+                <tr><td>Pelanggan</td><td>: ${items[0].pembeli || 'Umum'}</td></tr>
+            </table>
+            <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">`;
+
+    items.forEach(item => {
+        html += `
+            <tr><td colspan="2">${item.nama_barang}</td></tr>
+            <tr>
+                <td style="padding-bottom:5px;">${item.qty} x Rp${item.harga_jual.toLocaleString('id-ID')}</td>
+                <td class="text-right" style="padding-bottom:5px;">Rp${item.total_harga.toLocaleString('id-ID')}</td>
+            </tr>`;
+    });
+
+    html += `</table>
+            <div style="border-bottom: 1px dashed #000; margin: 10px 0;"></div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <tr><td class="fw-bold">TOTAL BELANJA</td><td class="text-right fw-bold">Rp${totalStruk.toLocaleString('id-ID')}</td></tr>
+            </table>
+        </div>`;
+
+    document.getElementById('strukContent').innerHTML = html;
+    let printArea = document.getElementById('printAreaStruk');
+    printArea.style.display = 'block';
+    window.print();
+    printArea.style.display = 'none';
 }
 
 // --- 3. FUNGSI UNTUK MENCETAK ULANG STRUK (REPRINT) ---
