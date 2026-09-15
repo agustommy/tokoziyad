@@ -736,14 +736,18 @@
       </div>
       
       <div class="modal-footer border-0 pt-0 px-4 pb-4 d-flex flex-column gap-2">
-        <button type="button" class="btn btn-success w-100 py-3 fs-7 rounded-pill shadow-sm fw-bold" id="btnKonfirmasiBayar" onclick="prosesPembayaran()">✅ Proses Transaksi Selesai</button>
+    <button type="button" class="btn btn-success btn-sm w-100 py-2 rounded-pill shadow-sm fw-medium" id="btnKonfirmasiBayar" onclick="prosesPembayaran()">✅ Proses Transaksi Selesai</button>
+     </div>
         
-        <div class="d-flex gap-2 w-100">
-            <button type="button" class="btn btn-outline-primary w-50 py-2 rounded-pill fw-bold small" id="btnStatusBluetooth" onclick="hubungkanPrinterBluetooth()">🔵 Hubungkan BT</button>
-            <button type="button" class="btn btn-primary w-50 py-2 rounded-pill fw-bold small" onclick="cetakStrukBluetooth()">🖨️ Cetak Struk BT</button>
-        </div>
-        
-        <button type="button" class="btn btn-sm btn-link text-muted w-100 text-decoration-none mt-1" id="btnCetakThermal" onclick="cetakStrukThermal()">🖨️ Cetak Struk Sistem (Standard)</button>
+        <div class="d-flex flex-column gap-2 w-100">
+    <!-- Baris Tombol Bluetooth -->
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-primary btn-sm flex-fill rounded-pill fw-medium py-1" id="btnStatusBluetooth" onclick="hubungkanPrinterBluetooth()">🔵Cari BT</button>
+        <button type="button" class="btn btn-primary btn-sm flex-fill rounded-pill fw-medium py-1" onclick="cetakStrukBluetooth()">🖨️ Cetak Struk</button>
+    </div>
+    
+    <!-- Tombol Sistem (Standard) -->
+    <button type="button" class="btn btn-link btn-sm text-muted text-decoration-none" id="btnCetakThermal" onclick="cetakStrukThermal()">🖨️ Cetak Struk Sistem (Standard)</button>
       </div>
     </div>
   </div>
