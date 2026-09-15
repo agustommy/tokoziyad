@@ -1950,6 +1950,19 @@ async function cetakStrukBluetooth() {
 
     await kirimBytes(encoder.encode(str));
 }
+// --- 3. FUNGSI UNTUK MENCETAK ULANG STRUK (REPRINT) ---
+function cetakStrukUlang(index) {
+    let t = cacheTrxData[index];
+    if (!t) return alert("Data transaksi tidak ditemukan!");
+
+    // Ambil data dari riwayat dengan Fallback (Pencegahan Kosong)
+    let namaPembeli = t.pembeli || 'Umum (Nama Tidak Ditemukan)';
+    let totalTrx = t.total_harga || 0;
+    let waktuTrx = new Date(t.waktu).toLocaleString('id-ID');
+    
+    // Panggil fungsi cetak ulang berdasarkan waktu (karena Anda sudah membuat fungsi cetakStrukUlang(waktuKey) di atas)
+    cetakStrukUlang(t.waktu); 
+}
 </script>
 </body>
 </html>
