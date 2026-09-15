@@ -230,12 +230,12 @@
                     <input type="text" id="pembeliKasir" class="form-control" value="Umum" placeholder="Contoh: Budi">
                 </div>
                 <form id="formKasir" class="row g-3" autocomplete="off">
-                    <div class="col-8 position-relative">
+                    <div class="col-12 position-relative">
                         <label class="text-muted small fw-bold mb-2">Cari / Scan Barang</label>
                         <input type="text" id="inputCariKasir" class="form-control" placeholder="Nama / Barcode" required>
                         <div id="dropdownSaranKasir"></div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-5">
                         <label class="text-muted small fw-bold mb-2">Qty</label>
                         <input type="number" id="qtyJual" class="form-control" value="1" min="1" required>
                     </div>
@@ -259,11 +259,11 @@
         <div class="card bg-white">
             <div class="card-header bg-white d-flex justify-content-between align-items-center border-bottom pb-3 pt-3 px-3">
                 <span class="fs-6">🛒 Keranjang Belanja</span>
-                <span class="badge bg-primary text-white rounded-pill px-3 py-1 fs-6 shadow-sm" id="cartCount">0 item</span>
+                <span class="badge bg-primary text-white rounded-pill px-3 py-5 fs-6 shadow-sm" id="cartCount">0 item</span>
             </div>
             <div class="card-body p-0">
-                <div class="table-responsive border-0">
-                    <table class="table mb-0 text-center table-borderless table-striped">
+                <div class="table-responsive border-1">
+                    <table class="table mb-1 text-center table-borderless table-striped">
                         <thead class="bg-light"><tr><th class="text-start rounded-start">Barang</th><th>Qty</th><th>Subtotal</th><th class="rounded-end">Hapus</th></tr></thead>
                         <tbody id="tabelKeranjang">
                             <tr><td colspan="4" class="text-muted py-5 fw-medium">Belum ada barang di keranjang</td></tr>
