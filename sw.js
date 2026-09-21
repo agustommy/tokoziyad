@@ -1,5 +1,5 @@
 // 1. UBAH VERSI INI SETIAP KALI ADA PERUBAHAN TAMPILAN (misal: v3, v4, v5, dst)
-const CACHE_NAME = 'kasir-cache-v8'; 
+const CACHE_NAME = 'kasir-cache-v9'; 
 
 self.addEventListener('install', e => {
   self.skipWaiting(); // Langsung aktifkan service worker baru
