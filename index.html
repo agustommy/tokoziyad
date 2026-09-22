@@ -2550,65 +2550,146 @@ function ambilDataStrukBluetooth() {
 }
 
 async function cetakStrukBluetooth() {
-    if (!bluetoothCharacteristic) return alert('Silakan hubungkan printer Bluetooth terlebih dahulu!');
+    if (!bluetoothCharacteristic) {
+        return alert("Silakan hubungkan printer Bluetooth terlebih dahulu!");
+    }
+    if (!Array.isArray(keranjang) || keranjang.length === 0) {
+        return alert("Keranjang belanja masih kosong!");
+    }
 
-    const receipt = ambilDataStrukBluetooth();
-    if (!receipt.items?.length) return alert('Belum ada barang untuk dicetak.');
+    const namaPembeli = cleanBT(document.getElementById('pembeliKasir')?.value || 'Umum') || 'Umum';
+    const nominalDiskonInput = Number(document.getElementById('inputDiskon')?.value || 0);
+    const uangBayarInput = Number(document.getElementById('inputUangBayar')?.value || 0);
+
+    const subtotalBruto = keranjang.reduce(
+        (sum, item) => sum + (Number(item.hargaJual) || 0) * (Number(item.qty) || 0),
+        0
+    );
+    const nominalDiskon = Math.min(Math.max(0, nominalDiskonInput), subtotalBruto);
+    const totalBayar = Math.max(0, subtotalBruto - nominalDiskon);
+
+    // Bila kasir belum mengetik uang, anggap dibayar pas untuk kebutuhan preview/cetak.
+    const uangBayar = Math.max(totalBayar, uangBayarInput || totalBayar);
+    const uangKembalian = Math.max(0, uangBayar - totalBayar);
+    const sisaTagihan = Math.max(0, totalBayar - uangBayar);
+    const totalQty = keranjang.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
+
+    const now = new Date();
+    const noStruk = `Z-${String(now.getFullYear()).slice(-2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}${String(now.getSeconds()).padStart(2,'0')}`;
+
+    const potonganItem = (() => {
+        // Alokasi proporsional hanya untuk ditampilkan per item.
+        // Total diskon keseluruhan tetap berasal dari nominalDiskon.
+        if (!nominalDiskon || !subtotalBruto) return keranjang.map(() => 0);
+        let sisa = nominalDiskon;
+        return keranjang.map((item, index) => {
+            const bruto = (Number(item.hargaJual) || 0) * (Number(item.qty) || 0);
+            if (index === keranjang.length - 1) return Math.max(0, sisa);
+            const bagian = Math.floor(nominalDiskon * (bruto / subtotalBruto));
+            sisa -= bagian;
+            return Math.max(0, bagian);
+        });
+    })();
 
     const encoder = new TextEncoder();
-    const W = 32; // Thermal 58mm umumnya 32 karakter pada font normal.
-    const garis = '-'.repeat(W);
-    let str = '';
+    const bytes = [];
 
-    // Reset + code page standar. Tidak menggunakan emoji agar printer thermal tidak mencetak karakter acak.
-    str += '\x1b\x40';
-    str += '\x1b\x74\x00';
+    // Reset.
+    bytes.push(0x1B, 0x40);
+    // Codepage 437 / ASCII kompatibel pada sebagian besar printer thermal.
+    bytes.push(0x1B, 0x74, 0x00);
+    // Font A.
+    bytes.push(0x1B, 0x4D, 0x00);
+    // Spasi baris lebih nyaman.
+    bytes.push(0x1B, 0x33, 28);
 
-    str += '\x1b\x61\x01';
-    str += 'TOKO ZIYAD\n';
-    str += 'Struk Pembelian\n';
-    str += '\x1b\x61\x00';
-    str += garis + '\n';
+    const add = (s = '') => bytes.push(...encoder.encode(String(s) + '\n'));
+    const addLines = (lines) => lines.forEach(add);
 
-    const waktu = new Date(receipt.waktu || Date.now()).toLocaleString('id-ID');
-    str += `Tgl  : ${waktu}\n`;
-    potongTeksBluetooth(`Kasir: ${receipt.kasir || '-'}`, W).forEach(l => str += l + '\n');
-    potongTeksBluetooth(`Pelanggan: ${receipt.pembeli || 'Umum'}`, W).forEach(l => str += l + '\n');
-    str += garis + '\n';
+    // HEADER
+    bytes.push(0x1B, 0x61, 0x01); // center
+    bytes.push(0x1B, 0x45, 0x01); // bold
+    bytes.push(0x1D, 0x21, 0x11); // double width + double height
+    add(btCenter('TOKO ZIYAD'));
+    bytes.push(0x1D, 0x21, 0x00);
+    add(btCenter('STRUK PEMBELIAN'));
+    bytes.push(0x1B, 0x45, 0x00);
+    add(btLine('='));
 
-    for (const item of receipt.items) {
-        potongTeksBluetooth(item.nama || item.sku || 'Barang', W).forEach(line => {
-            str += line + '\n';
-        });
-        const qty = Number(item.qty) || 0;
-        const harga = Number(item.hargaJual) || 0;
-        const subtotal = Number(item.subtotal ?? (harga * qty)) || 0;
-        str += rataKiriKananBT(`${qty} x ${formatRpBT(harga)}`, formatRpBT(subtotal), W) + '\n';
+    // IDENTITAS TRANSAKSI
+    bytes.push(0x1B, 0x61, 0x00); // left
+    add(`No. Struk : ${noStruk}`);
+    add(`Tanggal   : ${now.toLocaleString('id-ID')}`);
+    wrapBT(`Kasir     : ${currentUser?.nama_lengkap || 'Kasir'}`).forEach(add);
+    wrapBT(`Pelanggan : ${namaPembeli}`).forEach(add);
+    add(btLine('-'));
+
+    // ITEM
+    bytes.push(0x1B, 0x45, 0x01);
+    add('DETAIL BELANJA');
+    bytes.push(0x1B, 0x45, 0x00);
+
+    keranjang.forEach((item, index) => {
+        const lines = btItemLines(item, index, potonganItem[index] || 0);
+        addLines(lines);
+        add(btLine('.'));
+    });
+
+    // RINGKASAN
+    add(btLine('-'));
+    bytes.push(0x1B, 0x45, 0x01);
+    add('RINGKASAN PEMBAYARAN');
+    bytes.push(0x1B, 0x45, 0x00);
+
+    add(btMoneyRow('Subtotal', subtotalBruto));
+    add(btRow('Total Qty', String(totalQty)));
+
+    if (nominalDiskon > 0) {
+        add(btRow('Diskon', '-' + formatRpBT(nominalDiskon)));
+    } else {
+        add(btMoneyRow('Diskon', 0));
     }
 
-    str += garis + '\n';
-    if (Number(receipt.diskon) > 0) {
-        str += rataKiriKananBT('Diskon', '-' + formatRpBT(receipt.diskon), W) + '\n';
-    }
-    str += rataKiriKananBT('TOTAL', formatRpBT(receipt.total), W) + '\n';
-    str += rataKiriKananBT('Bayar', formatRpBT(receipt.bayar), W) + '\n';
-    str += rataKiriKananBT('Kembali', formatRpBT(receipt.kembali), W) + '\n';
-    str += garis + '\n';
-    str += '\x1b\x61\x01';
-    str += 'Terima Kasih!\n';
-    str += 'Barang yang sudah dibeli\n';
-    str += 'tidak dapat dikembalikan.\n';
-    str += '\n\n\n';
-    // Feed + cut. Printer yang tidak punya cutter akan mengabaikan perintah ini.
-    str += '\x1d\x56\x00';
+    add(btLine('-'));
+
+    // TOTAL dibuat lebih besar.
+    bytes.push(0x1B, 0x45, 0x01);
+    bytes.push(0x1D, 0x21, 0x10);
+    add(btRow('TOTAL', formatRpBT(totalBayar)));
+    bytes.push(0x1D, 0x21, 0x00);
+
+    add(btLine('-'));
+    add(btMoneyRow('Uang Bayar', uangBayar));
+    add(btMoneyRow('Kembalian', uangKembalian));
+    add(btMoneyRow('Sisa Tagihan', sisaTagihan));
+
+    bytes.push(0x1B, 0x45, 0x01);
+    add(`STATUS: ${sisaTagihan <= 0 ? 'LUNAS' : 'BELUM LUNAS'}`);
+    bytes.push(0x1B, 0x45, 0x00);
+
+    // FOOTER
+    add(btLine('='));
+    bytes.push(0x1B, 0x61, 0x01);
+    bytes.push(0x1B, 0x45, 0x01);
+    add('TERIMA KASIH');
+    bytes.push(0x1B, 0x45, 0x00);
+    add('Barang yang sudah dibeli');
+    add('tidak dapat dikembalikan.');
+    add('');
+    add('');
+    add('');
+
+    // Potong kertas bila printer mendukung.
+    bytes.push(0x1D, 0x56, 0x00);
 
     try {
-        showLoading('Mengirim struk ke printer Bluetooth...');
-        await kirimBytes(encoder.encode(str));
+        showLoading('Mencetak struk ke printer Bluetooth...');
+        await kirimBytes(new Uint8Array(bytes));
         hideLoading();
-        notify('Struk berhasil dikirim ke printer Bluetooth.', 'success', 'Printer Bluetooth');
+        notify('Struk Bluetooth berhasil dicetak.', 'success', 'Printer Bluetooth');
     } catch (e) {
         hideLoading();
+        console.error(e);
         alert('Gagal mencetak via Bluetooth: ' + (e?.message || e));
     }
 }
