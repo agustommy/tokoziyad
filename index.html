@@ -553,12 +553,12 @@
                     <input type="text" id="pembeliKasir" class="form-control" value="Umum" placeholder="Contoh: Budi">
                 </div>
                 <form id="formKasir" class="row g-3" autocomplete="off">
-                    <div class="col-8 position-relative">
+                    <div class="col-13 position-relative">
                         <label class="text-muted small fw-bold mb-2">Cari / Scan Barang</label>
                         <input type="text" id="inputCariKasir" class="form-control" placeholder="Nama / Barcode" required>
                         <div id="dropdownSaranKasir"></div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-10">
                         <label class="text-muted small fw-bold mb-2">Qty</label>
                         <input type="number" id="qtyJual" class="form-control" value="1" min="1" required>
                     </div>
@@ -950,11 +950,11 @@
                             </div>
                             <div class="d-flex gap-2 align-items-center">
                                 <select id="filterStokMenipis" class="form-select form-select-sm shadow-sm text-danger fw-bold border-danger" onchange="renderStokMenipis()" style="width: auto;">
-                                    <option value="5">≤ 5 (Default)</option>
-                                    <option value="4">≤ 4 Pcs</option>
-                                    <option value="3">≤ 3 Pcs</option>
+                                    <option value="1">≤ 1 (Default)</option>
                                     <option value="2">≤ 2 Pcs</option>
-                                    <option value="1">≤ 1 Pcs</option>
+                                    <option value="3">≤ 3 Pcs</option>
+                                    <option value="4">≤ 4 Pcs</option>
+                                    <option value="5">≤ 5 Pcs</option>
                                  </select>
                                 <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="downloadTxtStokMenipis()">📥 TXT</button>
                             </div>
@@ -1529,7 +1529,8 @@ function bukaModalEdit(sku) {
 async function simpanEditProdukLengkap() {
     if(!supabase) return;
     let oldSku = document.getElementById('edit_oldSku').value; let newSku = document.getElementById('edit_sku').value;
-    let pay = { sku: newSku, nama: document.getElementById('edit_nama').value, harga_beli: parseInt(document.getElementById('edit_hbeli').value)||0, harga_jual: parseInt(document.getElementById('edit_hjual').value)||0, stok: parseInt(document.getElementById('edit_stok').value)||0, kadaluarsa: document.getElementById('edit_kadaluarsa').value, penjual: document.getElementById('edit_penjual').value };
+    if (!validasiInputKadaluarsa('edit_kadaluarsa', false)) return;
+    let pay = { sku: newSku, nama: document.getElementById('edit_nama').value, harga_beli: parseInt(document.getElementById('edit_hbeli').value)||0, harga_jual: parseInt(document.getElementById('edit_hjual').value)||0, stok: parseInt(document.getElementById('edit_stok').value)||0, kadaluarsa: normalisasiTanggalKadaluarsa(document.getElementById('edit_kadaluarsa').value), penjual: document.getElementById('edit_penjual').value };
     showLoading("Menyimpan..."); if(oldSku !== newSku) await supabase.from('stok').delete().eq('sku', oldSku);
     const { error } = await supabase.from('stok').upsert([pay]); hideLoading();
     if (error) { alert("Gagal: " + error.message); return; }
@@ -1598,7 +1599,8 @@ async function sinkronisasiRestokOffline() {
 document.getElementById('formBeli').addEventListener('submit', async function(e) {
     e.preventDefault();
     let sku = document.getElementById('b_sku').value.trim(); let nama = document.getElementById('b_nama').value.trim(); let qty = parseInt(document.getElementById('b_qty').value)||0;
-    let pay = { sku: sku, nama: nama, harga_beli: parseInt(document.getElementById('b_hbeli').value)||0, harga_jual: parseInt(document.getElementById('b_hjual').value)||0, kadaluarsa: document.getElementById('b_kadaluarsa').value.trim(), penjual: document.getElementById('b_penjual').value.trim(), stok: qty };
+    if (!validasiInputKadaluarsa('b_kadaluarsa', false)) return;
+    let pay = { sku: sku, nama: nama, harga_beli: parseInt(document.getElementById('b_hbeli').value)||0, harga_jual: parseInt(document.getElementById('b_hjual').value)||0, kadaluarsa: normalisasiTanggalKadaluarsa(document.getElementById('b_kadaluarsa').value), penjual: document.getElementById('b_penjual').value.trim(), stok: qty };
     bunyiBeepLoud('success');
     if (!navigator.onLine) { simpanRestokOffline(pay); alert("⚠️ Disimpan Offline!"); } 
     else {
@@ -2016,7 +2018,7 @@ function handleExcelUpload(event) {
                     harga_beli: parseInt(row["Harga Beli"] ?? row["harga_beli"] ?? 0) || 0,
                     harga_jual: parseInt(row["Harga Jual"] ?? row["harga_jual"] ?? 0) || 0,
                     stok: parseInt(row["Stok"] ?? row["stok"] ?? 0) || 0,
-                    kadaluarsa: String(row["Kadaluarsa"] || row["kadaluarsa"] || "").trim(),
+                    kadaluarsa: normalisasiTanggalKadaluarsa(row["Kadaluarsa"] ?? row["kadaluarsa"] ?? ""),
                     penjual: String(row["Supplier"] || row["penjual"] || "").trim()
                 };
 
@@ -2206,40 +2208,133 @@ function downloadTxtStokMenipis() {
     a.click();
 }
 
+function parseTanggalKadaluarsa(value) {
+    if (value === null || value === undefined || value === '') return null;
+
+    // Excel/XLSX: tanggal bisa masuk sebagai serial number.
+    if (typeof value === 'number' && Number.isFinite(value)) {
+        const base = Date.UTC(1899, 11, 30);
+        const utcMs = base + Math.round(value) * 86400000;
+        const x = new Date(utcMs);
+        if (Number.isNaN(x.getTime())) return null;
+        return new Date(x.getUTCFullYear(), x.getUTCMonth(), x.getUTCDate());
+    }
+
+    let raw = String(value).trim();
+    if (!raw) return null;
+
+    // Bersihkan jam/timezone jika data berasal dari database/API.
+    raw = raw.replace(/T.*$/, '').replace(/\s+.*$/, '').trim();
+    raw = raw.replace(/[.]/g, '-').replace(/[\/]/g, '-');
+
+    let day, month, year;
+    let m;
+
+    // DD-MM-YYYY / D-M-YYYY
+    m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+    if (m) {
+        day = Number(m[1]); month = Number(m[2]); year = Number(m[3]);
+    }
+    // YYYY-MM-DD / YYYY-M-D
+    else if ((m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) {
+        year = Number(m[1]); month = Number(m[2]); day = Number(m[3]);
+    }
+    // DD-MM-YY juga diterima, misalnya 30-09-26 -> 30-09-2026.
+    else if ((m = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/))) {
+        day = Number(m[1]); month = Number(m[2]); year = 2000 + Number(m[3]);
+    }
+    else {
+        return null;
+    }
+
+    if (![day, month, year].every(Number.isFinite)) return null;
+    if (year < 1900 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+
+    // Jangan gunakan new Date(string) untuk validasi tanggal kalender.
+    // Cek kembali komponen tanggal agar 31-02-2026 benar-benar ditolak.
+    const d = new Date(year, month - 1, day);
+    if (Number.isNaN(d.getTime())) return null;
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+
+    // Normalisasi ke awal hari lokal agar perhitungan H- tidak dipengaruhi jam.
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function normalisasiTanggalKadaluarsa(value) {
+    const d = parseTanggalKadaluarsa(value);
+    if (!d) return '';
+    return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+}
+
+function validasiInputKadaluarsa(inputId, wajib = false) {
+    const input = document.getElementById(inputId);
+    if (!input) return true;
+
+    const raw = String(input.value || '').trim();
+    if (!raw) {
+        input.classList.remove('is-invalid');
+        if (wajib) {
+            input.classList.add('is-invalid');
+            alert('Tanggal kadaluarsa wajib diisi. Gunakan format DD-MM-YYYY.');
+            input.focus();
+            return false;
+        }
+        return true;
+    }
+
+    const normal = normalisasiTanggalKadaluarsa(raw);
+    if (!normal) {
+        input.classList.add('is-invalid');
+        alert(`Tanggal kadaluarsa "${raw}" tidak valid. Gunakan DD-MM-YYYY, contoh 30-09-2026.`);
+        input.focus();
+        return false;
+    }
+
+    input.value = normal;
+    input.classList.remove('is-invalid');
+    return true;
+}
+
+function tanggalHariIniLokal() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function selisihHariKalender(tanggalAkhir, tanggalAwal = tanggalHariIniLokal()) {
+    const a = new Date(tanggalAkhir.getFullYear(), tanggalAkhir.getMonth(), tanggalAkhir.getDate());
+    const b = new Date(tanggalAwal.getFullYear(), tanggalAwal.getMonth(), tanggalAwal.getDate());
+    return Math.round((a.getTime() - b.getTime()) / 86400000);
+}
+
 function renderKadaluarsa() {
     const el = document.getElementById('listDekatKadaluarsa');
     if (!el) return;
-    const now = new Date();
-    const filtered = dbStok.filter(s => {
-        if (!s.kadaluarsa) return false;
-        const parts = String(s.kadaluarsa).split('-');
-        if (parts.length !== 3) return false;
-        const expDate = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]), 23, 59, 59);
-        if (Number.isNaN(expDate.getTime())) return false;
-        const diffDays = (expDate - now) / 86400000;
-        return diffDays <= 30;
-    }).sort((a,b) => {
-        const da = a.kadaluarsa.split('-').reverse().join('-');
-        const db = b.kadaluarsa.split('-').reverse().join('-');
-        return da.localeCompare(db);
-    });
+
+    const hariIni = tanggalHariIniLokal();
+    const filtered = dbStok.map(s => {
+        const expDate = parseTanggalKadaluarsa(s.kadaluarsa);
+        if (!expDate) return null;
+        return { ...s, _expDate: expDate, _diffDays: selisihHariKalender(expDate, hariIni) };
+    }).filter(s => s && s._diffDays <= 30)
+      .sort((a, b) => a._expDate.getTime() - b._expDate.getTime());
 
     let html = '';
     filtered.forEach(s => {
-        const parts = String(s.kadaluarsa).split('-');
-        const exp = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]), 23, 59, 59);
-        const diff = Math.ceil((exp - now) / 86400000);
+        const diff = s._diffDays;
         const label = diff < 0 ? 'Kadaluarsa' : (diff === 0 ? 'Hari ini' : `H-${diff}`);
-        const cls = diff < 0 ? 'bg-danger text-white' : 'bg-warning text-dark';
+        const cls = diff <= 0 ? 'bg-danger text-white' : 'bg-warning text-dark';
+        const tanggalTampil = normalisasiTanggalKadaluarsa(s.kadaluarsa);
         html += `<div class="d-flex justify-content-between align-items-center gap-3 py-3 border-bottom">
             <div class="min-w-0"><div class="fw-bold text-dark text-truncate">${escapeHtml(s.nama)}</div><div class="small text-muted">SKU: ${escapeHtml(s.sku)}</div></div>
-            <span class="badge ${cls} flex-shrink-0">${label} • ${escapeHtml(s.kadaluarsa)}</span>
+            <span class="badge ${cls} flex-shrink-0">${label} • ${tanggalTampil}</span>
         </div>`;
     });
+
     if (filtered.length === 0) html = '<div class="text-center py-4 text-muted small">✅ Tidak ada barang yang mendekati kadaluarsa dalam 30 hari.</div>';
     el.innerHTML = html;
 }
-
 /* ==========================================================================
    FUNGSI PENANGANAN DATA KOSONG / TERHAPUS & REPRINT STRUK
    ========================================================================== */
@@ -2248,7 +2343,7 @@ function renderKadaluarsa() {
 function renderRiwayatTransaksi() {
     let html = '';
     // Ambil 10 transaksi terakhir dari cache
-    let trxTerakhir = cacheTrxData.slice(0, 10);
+    let trxTerakhir = cacheTrxData.slice(0, 30);
     
     trxTerakhir.forEach((t, index) => {
         let waktu = new Date(t.waktu).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -2996,7 +3091,7 @@ async function cetakStrukBluetooth() {
            ============================================= */
 
         add(
-            'Terima kasih telah berbelanja'
+            'Terima kasih telah berbelanja. Jual Seadanya lah.'
         );
 
         add('');
