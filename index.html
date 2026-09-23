@@ -1897,85 +1897,82 @@ async function prosesPembayaran() {
 }
 
 function cetakStrukThermal() {
-    let namaPembeli = document.getElementById('pembeliKasir').value.trim() || 'Umum';
-    let nominalDiskon = parseInt(document.getElementById('inputDiskon').value) || 0;
-    let uangBayar = parseInt(document.getElementById('inputUangBayar').value);
-    if (isNaN(uangBayar) || uangBayar < totalTransaksiBayar) {
-        uangBayar = totalTransaksiBayar;
-    }
-    let uangKembalian = uangBayar - totalTransaksiBayar;
-
-    let stylePrint = `
-        <style>
-            @media print {
-                @page { margin: 0; }
-                body { margin: 0.5cm; }
-                body * { visibility: hidden; }
-                #printAreaStruk, #printAreaStruk * { visibility: visible; }
-                #printAreaStruk { position: absolute; left: 0; top: 0; width: 100%; }
-            }
-            .struk-container {
-                font-family: 'Courier New', Courier, monospace;
-                font-size: 13px; color: #000; width: 100%; max-width: 320px;
-                margin: 0 auto; background: #fff; padding: 10px;
-            }
-            .struk-header { text-align: center; margin-bottom: 15px; }
-            .struk-header h3 { margin: 0; font-size: 18px; font-weight: bold; text-transform: uppercase; }
-            .struk-header p { margin: 2px 0; font-size: 12px; }
-            .struk-garis { border-bottom: 1px dashed #000; margin: 10px 0; }
-            .struk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-            .struk-table td { padding: 2px 0; vertical-align: top; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .fw-bold { font-weight: bold; }
-        </style>
+    // 1. Ambil data keranjang dan hitungan
+    let namaToko = "Toko Ziyad";
+    let alamatToko = "Desa Teluk Mesjid. Kec. Danau Panggang"; // Ganti dengan alamat toko Anda
+    let noTelp = "081549123361"; // Ganti dengan nomor toko Anda
+    
+    let tanggal = new Date().toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    let kasir = currentUser.nama_lengkap || "Kasir";
+    let pembeli = document.getElementById('pembeliKasir').value || "Umum";
+    
+    // 2. Susun Bagian Header Struk
+    let strukHTML = `
+    <div style="font-family: 'Courier New', Courier, monospace; font-size: 12px; width: 58mm; color: #000; margin: 0 auto; padding: 0;">
+        <div style="text-align: center; margin-bottom: 8px;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: bold;">${namaToko}</h3>
+            <p style="margin: 2px 0; font-size: 11px;">${alamatToko}</p>
+            <p style="margin: 2px 0; font-size: 11px;">Telp: ${noTelp}</p>
+        </div>
+        <div style="border-bottom: 1px dashed #000; margin-bottom: 5px;"></div>
+        <table style="width: 100%; font-size: 11px; margin-bottom: 5px;">
+            <tr><td style="text-align: left;">Tgl</td><td style="text-align: right;">: ${tanggal}</td></tr>
+            <tr><td style="text-align: left;">Kasir</td><td style="text-align: right;">: ${kasir}</td></tr>
+            <tr><td style="text-align: left;">Pelanggan</td><td style="text-align: right;">: ${pembeli}</td></tr>
+        </table>
+        <div style="border-bottom: 1px dashed #000; margin-bottom: 5px;"></div>
+        <table style="width: 100%; font-size: 11px; margin-bottom: 5px;">
     `;
 
-    let html = stylePrint + `<div class="struk-container">
-        <div class="struk-header">
-            <h3>TOKO ZIYAD</h3>
-            <p>Struk Pembelian Kasir</p>
-        </div>
-        <div class="struk-garis"></div>
-        <table class="struk-table">
-            <tr><td width="35%">Tanggal</td><td>: ${new Date().toLocaleString('id-ID')}</td></tr>
-            <tr><td>Kasir</td><td>: ${currentUser.nama_lengkap}</td></tr>
-            <tr><td>Pelanggan</td><td>: ${namaPembeli}</td></tr>
-        </table>
-        <div class="struk-garis"></div>
-        <table class="struk-table">`;
-        
+    // 3. Susun Daftar Barang Belanjaan (Loop dari keranjang)
+    let total = 0;
     keranjang.forEach(item => {
-        let subtotalItem = item.hargaJual * item.qty;
-        html += `
-            <tr><td colspan="2">${item.nama}</td></tr>
+        let subtotal = item.qty * item.hargaJual;
+        total += subtotal;
+        strukHTML += `
             <tr>
-                <td style="padding-bottom: 5px;">${item.qty} x Rp${item.hargaJual.toLocaleString('id-ID')}</td>
-                <td class="text-right" style="padding-bottom: 5px;">Rp${subtotalItem.toLocaleString('id-ID')}</td>
-            </tr>`;
+                <td colspan="3" style="text-align: left; font-weight: bold; padding-top: 3px;">${item.nama}</td>
+            </tr>
+            <tr>
+                <td style="text-align: left; width: 45%;">${item.qty} x ${item.hargaJual.toLocaleString('id-ID')}</td>
+                <td style="text-align: right; width: 55%;" colspan="2">Rp ${subtotal.toLocaleString('id-ID')}</td>
+            </tr>
+        `;
     });
-    
-    html += `</table><div class="struk-garis"></div>
-        <table class="struk-table">`;
-    if(nominalDiskon > 0) {
-        html += `<tr><td>Diskon</td><td class="text-right">-Rp${nominalDiskon.toLocaleString('id-ID')}</td></tr>`;
-    }
-    html += `
-        <tr><td class="fw-bold">TOTAL BELANJA</td><td class="text-right fw-bold">Rp${totalTransaksiBayar.toLocaleString('id-ID')}</td></tr>
-        <tr><td>Tunai / Bayar</td><td class="text-right">Rp${uangBayar.toLocaleString('id-ID')}</td></tr>
-        <tr><td class="fw-bold">KEMBALIAN</td><td class="text-right fw-bold">Rp${uangKembalian.toLocaleString('id-ID')}</td></tr>
-    </table>
-    <div class="struk-garis"></div>
-    <div class="text-center" style="font-size: 12px; margin-top: 15px;">
-        <p style="margin: 0;">Terima Kasih Atas Kunjungan Anda!</p>
-    </div>
-    </div>`;
 
-    document.getElementById('strukContent').innerHTML = html;
-    let printArea = document.getElementById('printAreaStruk');
-    printArea.style.display = 'block';
+    // 4. Hitung Total, Diskon, Uang Bayar, Kembalian
+    let diskon = parseInt(document.getElementById('inputDiskon').value) || 0;
+    let totalAkhir = total - diskon;
+    let bayar = parseInt(document.getElementById('inputUangBayar').value) || totalAkhir;
+    let kembalian = bayar - totalAkhir;
+
+    // 5. Susun Bagian Footer Struk
+    strukHTML += `
+        </table>
+        <div style="border-bottom: 1px dashed #000; margin-bottom: 5px;"></div>
+        <table style="width: 100%; font-size: 11px; margin-bottom: 10px;">
+            <tr><td style="text-align: left;">Subtotal</td><td style="text-align: right;">Rp ${total.toLocaleString('id-ID')}</td></tr>
+            ${diskon > 0 ? `<tr><td style="text-align: left;">Diskon</td><td style="text-align: right;">- Rp ${diskon.toLocaleString('id-ID')}</td></tr>` : ''}
+            <tr><td style="text-align: left; font-weight: bold; font-size: 13px; padding-top:4px;">TOTAL</td><td style="text-align: right; font-weight: bold; font-size: 13px; padding-top:4px;">Rp ${totalAkhir.toLocaleString('id-ID')}</td></tr>
+            <tr><td style="text-align: left; padding-top:4px;">Tunai</td><td style="text-align: right; padding-top:4px;">Rp ${bayar.toLocaleString('id-ID')}</td></tr>
+            <tr><td style="text-align: left;">Kembali</td><td style="text-align: right;">Rp ${kembalian.toLocaleString('id-ID')}</td></tr>
+        </table>
+        <div style="border-bottom: 1px dashed #000; margin-bottom: 5px;"></div>
+        <div style="text-align: center; font-size: 11px; margin-top: 8px;">
+            <p style="margin: 2px 0;">Terima Kasih Atas Kunjungan Berbelanja Anda</p>
+            <p style="margin: 2px 0;">Jual Barang seadanya lah...</p>
+            <p style="margin: 6px 0 0 0; font-size: 9px; color: #555;">Powered by Toko Ziyad</p>
+        </div>
+    </div>
+    `;
+
+    // 6. Tampilkan ke dalam div cetak dan jalankan perintah print
+    document.getElementById('strukContent').innerHTML = strukHTML;
+    
+    // Munculkan area print, cetak, lalu sembunyikan lagi
+    document.getElementById('printAreaStruk').style.display = 'block';
     window.print();
-    printArea.style.display = 'none';
+    document.getElementById('printAreaStruk').style.display = 'none';
 }
 
 // IMPORT / EXPORT EXCEL GUDANG
