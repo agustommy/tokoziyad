@@ -1579,8 +1579,85 @@ function cetakStrukThermal() {
     printArea.style.display = 'none';
 }
 
-function hubungkanPrinterBluetooth() {
-    alert("Koneksi Bluetooth Printer Siap. Pastikan Bluetooth perangkat aktif.");
+/* ==========================================================================
+   FITUR INTEGRASI PRINTER BLUETOOTH (WEB BLUETOOTH API - ESC/POS)
+   ========================================================================== */
+let bluetoothDevice = null;
+let bluetoothCharacteristic = null;
+
+async function hubungkanPrinterBluetooth() {
+    try {
+        showLoading("Mencari Printer Bluetooth...");
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: [
+                '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS Service
+                '0000ffe0-0000-1000-8000-00805f9b34fb', // Serial Port Profile (SPP)
+                'e7810a71-73ae-499d-8c15-faa9aef0c3f2'  // Custom Panda/POS UUID
+            ]
+        });
+
+        const server = await bluetoothDevice.gatt.connect();
+        const services = await server.getPrimaryServices();
+
+        for (const service of services) {
+            const characteristics = await service.getCharacteristics();
+            for (const char of characteristics) {
+                if (char.properties.write || char.properties.writeWithoutResponse) {
+                    bluetoothCharacteristic = char;
+                    break;
+                }
+            }
+            if (bluetoothCharacteristic) break;
+        }
+
+        hideLoading();
+        if (bluetoothCharacteristic) {
+            let statusBtn = document.getElementById('btnStatusBluetooth');
+            if (statusBtn) statusBtn.innerText = `🟢 BT: ${bluetoothDevice.name || 'Panda Printer'}`;
+            alert(`✅ Printer Terhubung: ${bluetoothDevice.name || 'Printer Bluetooth'}`);
+        } else {
+            alert("⚠️ Printer terhubung tetapi karakteristik cetak (Write) tidak ditemukan.");
+        }
+    } catch (error) {
+        hideLoading();
+        if (error.name !== 'NotFoundError') {
+            alert("Gagal koneksi Bluetooth: " + error.message);
+        }
+    }
+}
+
+// Helper delay untuk memberi jeda antar paket
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+async function kirimBytesKePrinter(uint8Array) {
+    if (!bluetoothCharacteristic || !bluetoothDevice || !bluetoothDevice.gatt.connected) {
+        alert("⚠️ Koneksi terputus, menghubungkan ulang printer...");
+        await hubungkanPrinterBluetooth();
+        if (!bluetoothCharacteristic) return false;
+    }
+
+    try {
+        // Printer RPP210A/Thermal BLE hanya mendukung max 20 byte per transmisi
+        const chunkSize = 20; 
+
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.slice(i, i + chunkSize);
+            
+            if (bluetoothCharacteristic.properties.writeWithoutResponse) {
+                await bluetoothCharacteristic.writeValueWithoutResponse(chunk);
+            } else {
+                await bluetoothCharacteristic.writeValue(chunk);
+            }
+            
+            // Jeda 25ms agar buffer penerima Bluetooth printer tidak kewalahan
+            await delay(25);
+        }
+        return true;
+    } catch (e) {
+        alert("Gagal mengirim data ke printer: " + e.message);
+        return false;
+    }
 }
 function cetakStrukBluetooth() {
     cetakStrukThermal();
