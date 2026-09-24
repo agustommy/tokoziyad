@@ -2516,11 +2516,17 @@ async function kirimBytes(bytes) {
 }
 
 
-<script>
 /* =========================================================
-   FORMATTER STRUK THERMAL BLUETOOTH & WEB - 58mm / MONOSPACE
+   FORMATTER STRUK THERMAL BLUETOOTH - 58mm / FONT MONOSPACE
+   Dibuat tanpa emoji agar printer thermal tidak menghasilkan
+   karakter acak.
    ========================================================= */
 const BT_WIDTH = 32;
+
+/* =========================================================
+   FORMAT STRUK REFERENSI 2 - MINIMARKET / THERMAL 58mm
+   Lebar aman: 32 karakter.
+   ========================================================= */
 
 function cleanBT(value) {
     return String(value ?? '')
@@ -2578,6 +2584,7 @@ function btLine(char = '-', width = BT_WIDTH) {
     return String(char).repeat(width);
 }
 
+/* Label di kiri, angka/nilai rata kanan. */
 function btRow(label, value, width = BT_WIDTH) {
     const l = cleanBT(label);
     const v = cleanBT(value);
@@ -2594,6 +2601,15 @@ function btRow(label, value, width = BT_WIDTH) {
         v;
 }
 
+/*
+ * Header kolom:
+ * NAMA BARANG       QTY     TOTAL
+ *
+ * 32 karakter:
+ * Nama = 18
+ * Qty  = 4
+ * Total = 10
+ */
 function btHeaderBarang() {
     return (
         'NAMA BARANG'.padEnd(18, ' ') +
@@ -2602,6 +2618,12 @@ function btHeaderBarang() {
     ).slice(0, BT_WIDTH);
 }
 
+/*
+ * Baris barang:
+ * Promina Supmie      1     15.000
+ *
+ * Nama panjang otomatis turun ke baris berikutnya.
+ */
 function btItemRows(item) {
     const rows = [];
 
@@ -2627,6 +2649,7 @@ function btItemRows(item) {
     const namaLines = wrapBT(nama, 18);
 
     namaLines.forEach((line, index) => {
+
         if (index === 0) {
             const namaKolom = line.slice(0, 18).padEnd(18, ' ');
             const qtyKolom = String(qty).slice(0, 5).padStart(5, ' ');
@@ -2639,6 +2662,7 @@ function btItemRows(item) {
                 qtyKolom +
                 totalKolom
             );
+
         } else {
             rows.push(line.slice(0, BT_WIDTH));
         }
@@ -2647,6 +2671,7 @@ function btItemRows(item) {
     return rows;
 }
 
+/* Tanggal dibuat dua bagian agar sama seperti referensi. */
 function btTanggal(now) {
     const dd = String(now.getDate()).padStart(2, '0');
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2661,6 +2686,7 @@ function btTanggal(now) {
     };
 }
 
+/* Nomor transaksi ringkas. */
 function btNomorStruk(now) {
     const yy = String(now.getFullYear()).slice(-2);
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -2673,176 +2699,7 @@ function btNomorStruk(now) {
 
 
 /* =========================================================
-   1. CETAK STRUK THERMAL (WEB / PREVIEW HTML)
-   ========================================================= */
-
-function cetakStrukThermal() {
-    if (!Array.isArray(keranjang) || keranjang.length === 0) {
-        alert('Keranjang belanja masih kosong!');
-        return '';
-    }
-
-    const namaToko = "TOKO ZIYAD";
-    const alamatToko = "Desa Teluk Mesjid Kec. Danau Panggang";
-    const noTelp = "081549123361";
-
-    const now = new Date();
-    const infoTanggal = btTanggal(now);
-    const noStruk = btNomorStruk(now);
-
-    const namaKasir = cleanBT(
-        currentUser?.nama_lengkap ||
-        currentUser?.nama ||
-        currentUser?.username ||
-        'Admin'
-    ) || 'Admin';
-
-    const namaPembeli = cleanBT(
-        document.getElementById('pembeliKasir')?.value || 'Umum'
-    ) || 'Umum';
-
-    const nominalDiskonInput = Number(document.getElementById('inputDiskon')?.value || 0);
-    const uangBayarInput = Number(document.getElementById('inputUangBayar')?.value || 0);
-
-    /* HITUNG TRANSAKSI */
-    const subtotalBruto = keranjang.reduce((sum, item) => {
-        const qty = Number(item.qty) || 0;
-        const harga = Number(item.hargaJual ?? item.harga ?? 0);
-        return sum + (qty * harga);
-    }, 0);
-
-    const nominalDiskon = Math.min(Math.max(0, nominalDiskonInput), subtotalBruto);
-    const totalBayar = Math.max(0, subtotalBruto - nominalDiskon);
-    const uangBayar = uangBayarInput > 0 ? uangBayarInput : totalBayar;
-    const uangKembalian = Math.max(0, uangBayar - totalBayar);
-    const sisaTagihan = Math.max(0, totalBayar - uangBayar);
-    const totalQty = keranjang.reduce((sum, item) => sum + (Number(item.qty) || 0), 0);
-
-    /* LAYOUT STRUK HTML */
-    let strukHTML = `
-    <div style="font-family: 'Courier New', Courier, monospace; font-size: 11px; width: 58mm; color: #000; margin: 0 auto; padding: 2px; box-sizing: border-box;">
-        
-        <!-- HEADER -->
-        <div style="text-align: center; margin-bottom: 6px;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: bold; text-transform: uppercase;">${namaToko}</h3>
-            <p style="margin: 2px 0; font-size: 10px;">${alamatToko}</p>
-            <p style="margin: 2px 0; font-size: 10px;">Telp: ${noTelp}</p>
-        </div>
-
-        <div style="border-bottom: 1px dashed #000; margin-bottom: 6px;"></div>
-
-        <!-- INFORMASI TRANSAKSI -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-            <tr><td style="text-align: left;">No : ${noStruk}</td></tr>
-            <tr><td style="text-align: left;">${infoTanggal.tanggal} ${infoTanggal.jam}</td></tr>
-            <tr><td style="text-align: left;">Kasir : ${namaKasir}</td></tr>
-            ${namaPembeli && namaPembeli.toLowerCase() !== 'umum' ? `<tr><td style="text-align: left;">Pelanggan : ${namaPembeli}</td></tr>` : ''}
-        </table>
-
-        <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-
-        <!-- HEADER BARANG -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse; font-weight: bold;">
-            <tr>
-                <td style="text-align: left; width: 55%;">NAMA BARANG</td>
-                <td style="text-align: center; width: 15%;">QTY</td>
-                <td style="text-align: right; width: 30%;">TOTAL</td>
-            </tr>
-        </table>
-
-        <div style="border-bottom: 1px dashed #000; margin: 4px 0;"></div>
-
-        <!-- BARANG -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-    `;
-
-    keranjang.forEach(item => {
-        const qty = Number(item.qty) || 0;
-        const harga = Number(item.hargaJual ?? item.harga ?? 0);
-        const subtotal = qty * harga;
-        const namaItem = cleanBT(item.nama || item.name || item.sku || 'Barang');
-
-        strukHTML += `
-            <tr>
-                <td style="text-align: left; width: 55%; vertical-align: top; word-break: break-word;">${namaItem}</td>
-                <td style="text-align: center; width: 15%; vertical-align: top;">${qty}</td>
-                <td style="text-align: right; width: 30%; vertical-align: top;">${formatRpBT(subtotal)}</td>
-            </tr>
-        `;
-    });
-
-    strukHTML += `
-        </table>
-
-        <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-
-        <!-- RINGKASAN -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse;">
-            <tr>
-                <td style="text-align: left;">TOTAL QTY</td>
-                <td style="text-align: right;">${totalQty}</td>
-            </tr>
-            <tr>
-                <td style="text-align: left;">SUBTOTAL</td>
-                <td style="text-align: right;">${formatRpBT(subtotalBruto)}</td>
-            </tr>
-            <tr>
-                <td style="text-align: left;">DISKON</td>
-                <td style="text-align: right;">${formatRpBT(nominalDiskon)}</td>
-            </tr>
-        </table>
-
-        <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-
-        <!-- TOTAL -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse; font-weight: bold;">
-            <tr>
-                <td style="text-align: left; font-size: 12px;">TOTAL</td>
-                <td style="text-align: right; font-size: 12px;">${formatRpBT(totalBayar)}</td>
-            </tr>
-        </table>
-
-        <!-- PEMBAYARAN -->
-        <table style="width: 100%; font-size: 11px; border-collapse: collapse; margin-top: 4px;">
-            <tr>
-                <td style="text-align: left;">TUNAI</td>
-                <td style="text-align: right;">${formatRpBT(uangBayar)}</td>
-            </tr>
-            ${sisaTagihan > 0 ? `
-            <tr>
-                <td style="text-align: left;">SISA</td>
-                <td style="text-align: right;">${formatRpBT(sisaTagihan)}</td>
-            </tr>
-            ` : `
-            <tr>
-                <td style="text-align: left;">KEMBALI</td>
-                <td style="text-align: right;">${formatRpBT(uangKembalian)}</td>
-            </tr>
-            `}
-        </table>
-
-        <div style="border-bottom: 1px dashed #000; margin: 6px 0;"></div>
-
-        <!-- STATUS -->
-        <div style="text-align: center; font-weight: bold; font-size: 12px; margin: 4px 0;">
-            ${sisaTagihan <= 0 ? 'LUNAS' : 'BELUM LUNAS'}
-        </div>
-
-        <div style="border-bottom: 1px dashed #000; margin-bottom: 6px;"></div>
-
-        <!-- FOOTER -->
-        <div style="text-align: center; font-size: 10px; margin-top: 6px;">
-            <p style="margin: 2px 0;">Terima kasih telah berbelanja. Jual Seadanya lah.</p>
-        </div>
-    </div>
-    `;
-
-    return strukHTML;
-}
-
-
-/* =========================================================
-   2. CETAK STRUK BLUETOOTH (ESC/POS)
+   CETAK STRUK BLUETOOTH
    ========================================================= */
 
 async function cetakStrukBluetooth() {
@@ -2915,6 +2772,11 @@ async function cetakStrukBluetooth() {
                 subtotalBruto - nominalDiskon
             );
 
+        /*
+         * Jika kolom uang bayar kosong, gunakan total
+         * sebagai pembayaran pas agar status tidak salah
+         * saat mencetak dari tombol preview.
+         */
         const uangBayar =
             uangBayarInput > 0
                 ? uangBayarInput
@@ -2997,6 +2859,10 @@ async function cetakStrukBluetooth() {
             0x1B, 0x45, 0x01
         );
 
+        /*
+         * Hanya TOKO ZIYAD yang diperbesar.
+         * Agar struk tetap pendek.
+         */
         bytes.push(
             0x1D, 0x21, 0x11
         );
@@ -3039,6 +2905,12 @@ async function cetakStrukBluetooth() {
             `Kasir : ${namaKasir}`.slice(0, BT_WIDTH)
         );
 
+
+        /*
+         * Pelanggan tidak ditampilkan jika Umum,
+         * karena referensi 2 memang dibuat ringkas.
+         * Jika pelanggan diisi selain Umum, tampilkan.
+         */
         if (
             namaPembeli &&
             namaPembeli.toLowerCase() !== 'umum'
@@ -3160,6 +3032,10 @@ async function cetakStrukBluetooth() {
             )
         );
 
+        /*
+         * Hanya cetak KEMBALI jika ada kembalian.
+         * Jika pembayaran kurang, cetak SISA.
+         */
         if (sisaTagihan > 0) {
 
             add(
@@ -3219,11 +3095,12 @@ async function cetakStrukBluetooth() {
         add('');
 
 
-        /* FEED & CUT */
+        /* FEED */
         bytes.push(
             0x1B, 0x64, 0x03
         );
 
+        /* CUT */
         bytes.push(
             0x1D, 0x56, 0x00
         );
