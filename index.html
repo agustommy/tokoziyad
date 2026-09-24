@@ -226,22 +226,22 @@
                     <span class="fs-4">📷</span> Buka Scanner
                 </button>
                 <div class="mb-4">
-                    <label class="text-muted small fw-bold mb-1">Nama Pembeli</label>
+                    <label class="text-muted small fw-bold mb-2">Nama Pembeli</label>
                     <input type="text" id="pembeliKasir" class="form-control" value="Umum" placeholder="Contoh: Budi">
                 </div>
                 <form id="formKasir" class="row g-3" autocomplete="off">
-                    <div class="col-18 position-relative">
-                        <label class="text-muted small fw-bold mb-1">Cari / Scan Barang</label>
+                    <div class="col-14 position-relative">
+                        <label class="text-muted small fw-bold mb-2">Cari / Scan Barang</label>
                         <input type="text" id="inputCariKasir" class="form-control" placeholder="Nama / Barcode" required>
                         <div id="dropdownSaranKasir"></div>
                     </div>
-                    <div class="col-5">
-                        <label class="text-muted small fw-bold mb-1">Qty</label>
+                    <div class="col-14">
+                        <label class="text-muted small fw-bold mb-2">Qty</label>
                         <input type="number" id="qtyJual" class="form-control" value="1" min="1" required>
                     </div>
                     <div class="col-12 mt-4">
                         <button type="submit" class="btn btn-primary w-100 py-3 d-flex justify-content-center align-items-center gap-2">
-                            <span class="fs-11">➕</span> Tambah ke Keranjang
+                            <span class="fs-5">➕</span> Tambah ke Keranjang
                         </button>
                     </div>
                 </form>
@@ -274,7 +274,7 @@
             <div class="card-footer bg-light border-0 p-4" style="border-radius: 0 0 var(--radius-lg) var(--radius-lg);">
                 <div class="mb-4 p-3 bg-white rounded-3 shadow-sm">
                     <label class="text-dark small fw-bold mb-3 d-block">✂️ Potongan Harga / Diskon:</label>
-                    <div class="d-flex gap-0 flex-wrap mb-1">
+                    <div class="d-flex gap-0 flex-wrap mb-2">
                         <button class="btn btn-sm btn-outline-primary rounded-pill px-2" onclick="setDiskonPersen(10)">10%</button>
                         <button class="btn btn-sm btn-outline-primary rounded-pill px-2" onclick="setDiskonPersen(15)">15%</button>
                         <button class="btn btn-sm btn-outline-primary rounded-pill px-2" onclick="setDiskonPersen(20)">20%</button>
@@ -716,12 +716,12 @@
             <input type="number" id="inputUangBayar" class="form-control form-control-lg fs-2 fw-bold text-primary py-3 text-center bg-light mb-3" placeholder="0" oninput="hitungKembalian()">
             
             <div class="d-flex flex-nowrap justify-content-center overflow-x-auto" style="gap: 2px;">
-    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="tambahUang(5000)">5K</button>
-    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="tambahUang(10000)">10K</button>
-    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="tambahUang(20000)">20K</button>
-    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="tambahUang(50000)">50K</button>
-    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="tambahUang(100000)">100K</button>
-    <button type="button" class="btn btn-outline-danger fw-bold rounded-pill" style="padding: 2px 8px; font-size: 13px;" onclick="resetUang()">RSET</button>
+    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="tambahUang(5000)">5K</button>
+    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="tambahUang(10000)">10K</button>
+    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="tambahUang(20000)">20K</button>
+    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="tambahUang(50000)">50K</button>
+    <button type="button" class="btn btn-outline-primary fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="tambahUang(100000)">100K</button>
+    <button type="button" class="btn btn-outline-danger fw-bold rounded-pill" style="padding: 2px 8px; font-size: 14px;" onclick="resetUang()">RSET</button>
 </div>
         </div>
         <div class="mb-4 p-4 border rounded-4 d-flex justify-content-between align-items-center bg-white shadow-sm">
