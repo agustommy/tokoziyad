@@ -1659,8 +1659,96 @@ async function kirimBytesKePrinter(uint8Array) {
         return false;
     }
 }
-function cetakStrukBluetooth() {
-    cetakStrukThermal();
+async function cetakStrukBluetooth() {
+    if (keranjang.length === 0) return alert("Keranjang belanja masih kosong!");
+
+    let encoder = new TextEncoder();
+    let namaPembeli = document.getElementById('pembeliKasir').value.trim() || 'Umum';
+    let nominalDiskon = parseInt(document.getElementById('inputDiskon').value) || 0;
+    let uangBayar = parseInt(document.getElementById('inputUangBayar').value) || totalTransaksiBayar;
+    let uangKembalian = uangBayar - totalTransaksiBayar;
+
+    let bytes = [];
+
+    // 1. Reset Printer & Inisialisasi
+    bytes.push(0x1B, 0x40);
+
+    // 2. Gunakan Font A (12x24 Dot) -> Huruf Lebih Besar & Tebal Dibanding Font B
+    bytes.push(0x1B, 0x4D, 0x00);
+
+    // 3. Atur Spasi Baris (Line Spacing) Agar Teks Tidak Saling Menumpuk/Rapat
+    bytes.push(0x1B, 0x33, 34);
+
+    // --- HEADER (JUDUL TOKO) ---
+    bytes.push(0x1B, 0x61, 0x01); // Align Center
+    bytes.push(0x1B, 0x21, 0x30); // Double Height + Double Width + Bold
+    bytes.push(...encoder.encode("TOKO ZIYAD\n"));
+
+    bytes.push(0x1B, 0x21, 0x00); // Reset Ke Ukuran Font Normal
+    bytes.push(0x1B, 0x45, 0x01); // Mode BOLD Aktif (Teks Tebal)
+    bytes.push(...encoder.encode("Struk Pembelian Kasir\n"));
+    bytes.push(...encoder.encode("--------------------------------\n"));
+
+    // --- INFORMASI TRANSAKSI ---
+    bytes.push(0x1B, 0x61, 0x00); // Align Left
+    bytes.push(...encoder.encode(`Tgl   : ${new Date().toLocaleString('id-ID')}\n`));
+    bytes.push(...encoder.encode(`Kasir : ${currentUser ? currentUser.nama_lengkap : 'Kasir'}\n`));
+    bytes.push(...encoder.encode(`Plgn  : ${namaPembeli}\n`));
+    bytes.push(...encoder.encode("--------------------------------\n"));
+
+    // --- DAFTAR ITEM BELANJA ---
+    keranjang.forEach(item => {
+        let subtotalItem = item.hargaJual * item.qty;
+        
+        // Nama Barang (Bold)
+        bytes.push(0x1B, 0x45, 0x01);
+        bytes.push(...encoder.encode(`${item.nama}\n`));
+
+        // Qty & Subtotal (Slightly Normal)
+        bytes.push(0x1B, 0x45, 0x00);
+        let qtyLine = `${item.qty} x Rp${item.hargaJual.toLocaleString('id-ID')}`;
+        let subLine = `Rp${subtotalItem.toLocaleString('id-ID')}`;
+        let spaceLen = Math.max(1, 32 - (qtyLine.length + subLine.length));
+        bytes.push(...encoder.encode(qtyLine + " ".repeat(spaceLen) + subLine + "\n"));
+    });
+
+    bytes.push(...encoder.encode("--------------------------------\n"));
+
+    // --- RINCIAN TOTAL & PEMBAYARAN ---
+    bytes.push(0x1B, 0x45, 0x01); // Mode Bold Aktif
+
+    if (nominalDiskon > 0) {
+        let discVal = `-Rp${nominalDiskon.toLocaleString('id-ID')}`;
+        let spcDisc = Math.max(1, 32 - ("Diskon".length + discVal.length));
+        bytes.push(...encoder.encode("Diskon" + " ".repeat(spcDisc) + discVal + "\n"));
+    }
+
+    // Teks TOTAL (Diperbesar 2x Tinggi & Bold)
+    bytes.push(0x1B, 0x21, 0x10); 
+    let totVal = `Rp${totalTransaksiBayar.toLocaleString('id-ID')}`;
+    let spcTot = Math.max(1, 32 - ("TOTAL".length + totVal.length));
+    bytes.push(...encoder.encode("TOTAL" + " ".repeat(spcTot) + totVal + "\n"));
+
+    // Reset Ukuran Teks untuk Tunai & Kembalian
+    bytes.push(0x1B, 0x21, 0x00);
+    bytes.push(0x1B, 0x45, 0x01); // Tetap BOLD
+
+    let bayarVal = `Rp${uangBayar.toLocaleString('id-ID')}`;
+    let spcBayar = Math.max(1, 32 - ("Tunai/Bayar".length + bayarVal.length));
+    bytes.push(...encoder.encode("Tunai/Bayar" + " ".repeat(spcBayar) + bayarVal + "\n"));
+
+    let kembVal = `Rp${uangKembalian.toLocaleString('id-ID')}`;
+    let spcKemb = Math.max(1, 32 - ("Kembalian".length + kembVal.length));
+    bytes.push(...encoder.encode("Kembalian" + " ".repeat(spcKemb) + kembVal + "\n"));
+
+    // --- FOOTER STRUK ---
+    bytes.push(0x1B, 0x61, 0x01); // Align Center
+    bytes.push(0x1B, 0x45, 0x00); // Mode Normal
+    bytes.push(...encoder.encode("--------------------------------\n"));
+    bytes.push(...encoder.encode("Terima Kasih Atas Kunjungan Anda!\n"));
+    bytes.push(...encoder.encode("Dijual lah Seadaanya..\n\n\n\n")); // Feed Kertas
+
+    await kirimBytesKePrinter(new Uint8Array(bytes));
 }
 
 // IMPORT / EXPORT EXCEL GUDANG
