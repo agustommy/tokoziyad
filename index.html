@@ -1682,7 +1682,7 @@ async function cetakStrukBluetooth() {
     // --- HEADER (JUDUL TOKO) ---
     bytes.push(0x1B, 0x61, 0x01); // Align Center
     bytes.push(0x1B, 0x21, 0x30); // Double Height + Double Width + Bold
-    bytes.push(...encoder.encode("TOKO ZIYAD\n"));
+    bytes.push(...encoder.encode("🏪 TOKO ZIYAD\n"));
 
     bytes.push(0x1B, 0x21, 0x00); // Reset Ke Ukuran Font Normal
     bytes.push(0x1B, 0x45, 0x01); // Mode BOLD Aktif (Teks Tebal)
